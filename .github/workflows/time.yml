@@ -11,8 +11,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show Time
-        shell: cmd
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Show formatted time
         run: |
-          echo The current time is: %TIME%
-          echo The current date is: %DATE%
+          node - << 'EOF'
+          const config = require("./time.config.js");
+
+          const now = new Date();
+
+          let hours = now.getHours();
+          let minutes = now.getMinutes();
+          let seconds = now.getSeconds();
+          let ms = now.getMilliseconds();
+
+          if (!config.mil_time) {
+            hours = ((hours + 11) % 12) + 1;
+          }
+
+          const pad = (n, size = 2) => String(n).padStart(size, "0");
+
+          let formatted;
+
+          if (config.time_name === "long") {
+            formatted = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}:${pad(ms, 3)}`;
+          } else if (config.time_name === "medium") {
+            formatted = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+          } else if (config.time_name === "short") {
+            formatted = `${pad(hours)}:${pad(minutes)}`;
+          } else {
+            formatted = "Invalid time_name";
+          }
+
+          console.log("Formatted time:", formatted);
+          EOF
