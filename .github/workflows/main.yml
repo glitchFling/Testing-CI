@@ -1,49 +1,37 @@
-name: Emscripten CI
+name: Build WASM
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
+  build-wasm:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive # Required if emsdk is a submodule
 
-      - name: Cache Emscripten
-        id: cache-emsdk
-        uses: actions/cache@v4
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
         with:
-          path: ./emsdk
-          key: ${{ runner.os }}-emsdk-${{ hashFiles('./emsdk/emsdk.py') }}
+          version: 3.1.57
+          actions-cache-folder: emsdk-cache
 
-      - name: Setup and Build
+      - name: Build main.cpp → index.js + index.wasm
         run: |
-          # 1. Navigate to local SDK and prepare it
-          cd ./emsdk
-          
-          # Only install if the cache was not found
-          if [ "${{ steps.cache-emsdk.outputs.cache-hit }}" != 'true' ]; then
-            ./emsdk install latest
-          fi
-          
-          ./emsdk activate latest
-          source ./emsdk_env.sh
-          
-          # 2. Go back to root and compile
-          cd ..
-          emcc ./main.cpp -o ./index.js -O3 -s WASM=1
-          
-      - name: Upload Artifacts
+          emcc main.cpp -O3 \
+            -sMODULARIZE=1 \
+            -sEXPORT_ES6=1 \
+            -sEXPORTED_FUNCTIONS='["_hash1024_c","_hash2048_c","_hash4096_c"]' \
+            -sEXPORTED_RUNTIME_METHODS='["cwrap"]' \
+            -o index.js
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wasm-build
           path: |
-            ./index.js
-            ./index.wasm
+            index.js
+            index.wasm
