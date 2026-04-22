@@ -1,0 +1,49 @@
+name: Emscripten CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Required if emsdk is a submodule
+
+      - name: Cache Emscripten
+        id: cache-emsdk
+        uses: actions/cache@v4
+        with:
+          path: ./emsdk
+          key: ${{ runner.os }}-emsdk-${{ hashFiles('./emsdk/emsdk.py') }}
+
+      - name: Setup and Build
+        run: |
+          # 1. Navigate to local SDK and prepare it
+          cd ./emsdk
+          
+          # Only install if the cache was not found
+          if [ "${{ steps.cache-emsdk.outputs.cache-hit }}" != 'true' ]; then
+            ./emsdk install latest
+          fi
+          
+          ./emsdk activate latest
+          source ./emsdk_env.sh
+          
+          # 2. Go back to root and compile
+          cd ..
+          emcc ./main.cpp -o ./index.js -O3 -s WASM=1
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build
+          path: |
+            ./index.js
+            ./index.wasm
